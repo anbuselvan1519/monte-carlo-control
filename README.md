@@ -1,23 +1,80 @@
 # MONTE CARLO CONTROL ALGORITHM
 
 ## AIM
-Write the experiment AIM.
+To implement and evaluate the Monte Carlo Control algorithm to learn optimal policies in episodic reinforcement learning tasks.
 
 ## PROBLEM STATEMENT
-Explain the problem statement.
+Estimate action-value functions and derive an optimal policy for an unknown episodic environment using Monte Carlo sampling-based control methods.
 
 ## MONTE CARLO CONTROL ALGORITHM
-Include the steps involved in the Monte Carlo control algorithm
+1. Initialize action-value estimates and a policy; ensure exploring starts or apply an epsilon-soft policy for exploration.
+2. Generate complete episodes by following the current policy, recording state, action, and reward sequences until termination.
+3. For each state-action pair in an episode, compute the return from first occurrence and accumulate for averaging updates.
+4. Update action-value estimates by incremental averaging or weighted returns, then improve the policy greedily with exploration.
+5. Repeat episode generation and updates until convergence; evaluate learned policy's performance and stability over multiple runs.
 
 ## MONTE CARLO CONTROL FUNCTION
-Include the Monte Carlo control function
+```python
+def mc_control(env,
+               gamma=1.0,
+               init_alpha=0.5,
+               min_alpha=0.01,
+               alpha_decay_ratio=0.5,
+               init_epsilon=1.0,
+               min_epsilon=0.1,
+               epsilon_decay_ratio=0.9,
+               n_episodes=3000,
+               max_steps=200,
+               first_visit=True):
 
-## OUTPUT:
-### Name:
-### Register Number:
+    nS, nA = env.observation_space.n, env.action_space.n
 
-Mention the Action value function, optimal value function, optimal policy, and success rate for the optimal policy.
+    discounts = np.logspace(
+        0, max_steps,
+        num=max_steps, base=gamma,
+        endpoint=False)
 
-## RESULT:
+    alphas = decay_schedule(
+        init_alpha, min_alpha,
+        alpha_decay_ratio,
+        n_episodes)
 
-Write your result here
+    epsilons = decay_schedule(
+        init_epsilon, min_epsilon,
+        epsilon_decay_ratio,
+        n_episodes)
+
+    pi_track = []
+    Q = np.zeros((nS, nA), dtype=np.float64)
+    Q_track = np.zeros((n_episodes, nS, nA), dtype=np.float64)
+
+    select_action = lambda state, Q, epsilon:np.argmax(Q[state]) if np.random.random() > epsilon else np.random.randint(len(Q[state]))
+
+    for e in tqdm(range(n_episodes), leave=False):
+        trajectory = generate_trajectory(select_action, Q, epsilons[e], env, max_steps)
+        visited = np.zeros((nS, nA), dtype=bool)
+
+        for t, (state, action, reward, _, _) in enumerate(trajectory):
+            if visited[state][action] and first_visit:
+                continue
+            visited[state][action] = True
+
+            n_steps = len(trajectory[t:])
+            G = np.sum(discounts[:n_steps] * trajectory[t:, 2])
+            Q[state][action] = Q[state][action] + alphas[e] * (G - Q[state][action])
+
+        Q_track[e] = Q
+        pi_track.append(np.argmax(Q, axis=1))
+
+    v = np.max(Q, axis=1)
+    pi = np.argmax(Q, axis=1)
+    return Q, v, pi, Q_track, pi_track
+```
+
+## OUTPUT
+![WhatsApp Image 2025-10-14 at 11 15 12 AM](https://github.com/user-attachments/assets/f2ec63eb-567a-4668-810a-aee9a0acab63)
+
+
+## RESULT
+
+The Monte Carlo Control algorithm successfully estimated the optimal action-value function and derived the optimal policy. The learned policy achieved a high success rate, confirming effective convergence and performance.
